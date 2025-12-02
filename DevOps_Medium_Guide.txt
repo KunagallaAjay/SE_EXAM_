@@ -1,0 +1,321 @@
+========================================================
+DEVOPS MEDIUM-LEVEL LAB GUIDE (Maven + Jenkins + Docker +
+Kubernetes + Nagios)
+Format: SECTION-WISE, CLEAR, EXAM-READY (TXT VERSION)
+========================================================
+
+--------------------------------------------------------
+SECTION 1 — MAVEN (JAVA PROJECT)
+--------------------------------------------------------
+
+STEP 1: CREATE MAVEN JAVA PROJECT (Using Eclipse)
+--------------------------------------------------
+1. File → New → Maven Project
+2. Select archetype: maven-archetype-quickstart (1.4)
+3. GroupId: com.example
+4. ArtifactId: my-java-app
+5. Finish
+
+STEP 2: PROJECT STRUCTURE
+-------------------------
+my-java-app/
+ ├── src/main/java        → main source code
+ ├── src/test/java        → unit tests (JUnit)
+ └── pom.xml              → Maven configuration
+
+STEP 3: BASIC pom.xml FOR JAVA PROJECT
+---------------------------------------
+<project>
+  <modelVersion>4.0.0</modelVersion>
+  <groupId>com.example</groupId>
+  <artifactId>my-java-app</artifactId>
+  <version>1.0-SNAPSHOT</version>
+  <properties>
+     <maven.compiler.source>17</maven.compiler.source>
+     <maven.compiler.target>17</maven.compiler.target>
+  </properties>
+  <dependencies>
+     <dependency>
+       <groupId>org.junit.jupiter</groupId>
+       <artifactId>junit-jupiter-api</artifactId>
+       <version>5.11.0</version>
+       <scope>test</scope>
+     </dependency>
+  </dependencies>
+</project>
+
+STEP 4: COMMON MAVEN COMMANDS
+------------------------------
+mvn clean          → removes target directory
+mvn compile        → compiles java source
+mvn test           → runs test cases
+mvn package        → creates JAR file in target/
+mvn install        → installs JAR into ~/.m2 repository
+mvn dependency:tree → shows dependency tree
+
+STEP 5: EXECUTABLE JAR (ADD TO pom.xml)
+----------------------------------------
+<build>
+ <plugins>
+  <plugin>
+   <artifactId>maven-jar-plugin</artifactId>
+   <configuration>
+    <archive>
+     <manifest>
+       <mainClass>com.example.Main</mainClass>
+     </manifest>
+    </archive>
+   </configuration>
+  </plugin>
+ </plugins>
+</build>
+
+Run JAR:
+java -jar target/my-java-app-1.0-SNAPSHOT.jar
+
+STEP 6: COMMON ERRORS AND FIXES
+--------------------------------
+• No JAR created:
+  → Check <packaging>jar</packaging>, run mvn clean package
+• Wrong Java version:
+  → Fix compiler plugin version in pom.xml
+• Dependency not found:
+  → Check groupId/artifactId/version on mvnrepository.com
+
+
+--------------------------------------------------------
+SECTION 2 — MAVEN (WEB PROJECT)
+--------------------------------------------------------
+
+STEP 1: CREATE WEB PROJECT
+---------------------------
+Using Eclipse → Maven Project → Archetype:
+maven-archetype-webapp (1.4)
+
+STEP 2: pom.xml FOR WEB PROJECT
+-------------------------------
+<project>
+ <groupId>com.example</groupId>
+ <artifactId>my-web-app</artifactId>
+ <version>1.0</version>
+ <packaging>war</packaging>
+
+ <dependencies>
+   <dependency>
+     <groupId>javax.servlet</groupId>
+     <artifactId>javax.servlet-api</artifactId>
+     <version>4.0.1</version>
+     <scope>provided</scope>
+   </dependency>
+ </dependencies>
+</project>
+
+STEP 3: BUILD WEB PROJECT
+--------------------------
+mvn clean package
+Output: target/my-web-app.war
+
+STEP 4: DEPLOY WEB PROJECT (Exam Level)
+----------------------------------------
+• Use Tomcat → webapps folder
+• Copy WAR → webapps/
+• Start Tomcat → application auto deploys
+
+
+--------------------------------------------------------
+SECTION 3 — JENKINS (FREESTYLE + PIPELINE)
+--------------------------------------------------------
+
+STEP 1: CREATE FREESTYLE JOB FOR MAVEN PROJECT
+-----------------------------------------------
+1. New Item → Freestyle Project
+2. SCM → Git → Paste GitHub Repository URL
+3. Build → Add Maven Build Step
+   Goals: clean package
+4. Save → Build Now
+
+STEP 2: FREESTYLE JOB FOR WEB PROJECT
+--------------------------------------
+Similar steps but artifact → WAR file.
+
+STEP 3: PIPELINE JOB FOR JAVA PROJECT
+--------------------------------------
+Pipeline → Script:
+
+pipeline {
+  agent any
+  stages {
+    stage('Checkout') {
+      steps { git 'https://github.com/user/my-java-app.git' }
+    }
+    stage('Build') {
+      steps { sh 'mvn clean package' }
+    }
+    stage('Test') {
+      steps { sh 'mvn test' }
+    }
+  }
+}
+
+STEP 4: PIPELINE FOR WEB PROJECT
+---------------------------------
+pipeline {
+  agent any
+  stages {
+    stage('Checkout') {
+      steps { git 'https://github.com/user/my-web-app.git' }
+    }
+    stage('Build WAR') {
+      steps { sh 'mvn clean package' }
+    }
+  }
+}
+
+STEP 5: SEPARATE BUILD & TEST PIPELINES
+----------------------------------------
+BUILD JOB:
+pipeline {
+  agent any
+  stages {
+    stage('Build') { steps { sh 'mvn clean package' } }
+  }
+  post { success { build job: 'TestJob' } }
+}
+
+TEST JOB:
+pipeline {
+  agent any
+  stages {
+    stage('Test') { steps { sh 'mvn test' } }
+  }
+}
+
+STEP 6: EMAIL NOTIFICATIONS
+----------------------------
+Add in pipeline:
+post {
+  success { mail to:'me@example.com', subject:'Success', body:'Build OK' }
+  failure { mail to:'me@example.com', subject:'Failed', body:'Check logs' }
+}
+
+
+--------------------------------------------------------
+SECTION 4 — DOCKER (JAVA + WEB MAVEN PROJECTS)
+--------------------------------------------------------
+
+STEP 1: DOCKERFILE FOR JAVA PROJECT
+------------------------------------
+FROM eclipse-temurin:17-jdk
+COPY target/*.jar app.jar
+CMD ["java","-jar","app.jar"]
+
+Build:
+docker build -t javaapp:1 .
+
+Run:
+docker run -p 8080:8080 javaapp:1
+
+STEP 2: DOCKERFILE FOR WEB PROJECT (TOMCAT)
+--------------------------------------------
+FROM tomcat:9.0-jdk17
+COPY target/*.war /usr/local/tomcat/webapps/ROOT.war
+EXPOSE 8080
+CMD ["catalina.sh","run"]
+
+STEP 3: DOCKER-COMPOSE (IF REQUIRED)
+-------------------------------------
+version: '3'
+services:
+  web:
+    build: .
+    ports:
+     - "8080:8080"
+
+Run:
+docker compose up -d
+
+
+--------------------------------------------------------
+SECTION 5 — KUBERNETES (MINIKUBE BASIC LAB)
+--------------------------------------------------------
+
+STEP 1: START MINIKUBE
+-----------------------
+minikube start
+
+STEP 2: CREATE POD
+--------------------
+kubectl run mypod --image=nginx --port=80
+
+STEP 3: LIST PODS
+------------------
+kubectl get pods
+
+STEP 4: EXPOSE POD
+-------------------
+kubectl expose pod mypod --type=NodePort --port=80
+
+STEP 5: GET ACCESS URL
+-----------------------
+minikube service mypod --url
+
+STEP 6: VIEW LOGS
+------------------
+kubectl logs mypod
+
+STEP 7: DELETE POD
+-------------------
+kubectl delete pod mypod
+
+
+--------------------------------------------------------
+SECTION 6 — NAGIOS (DOCKER BASIC LAB)
+--------------------------------------------------------
+
+STEP 1: PULL IMAGE
+-------------------
+docker pull jasonrivers/nagios
+
+STEP 2: RUN NAGIOS
+-------------------
+docker run -d --name nagiosdemo -p 8888:80 jasonrivers/nagios
+
+STEP 3: ACCESS NAGIOS
+----------------------
+URL: http://localhost:8888
+User: nagiosadmin
+Pass: nagios
+
+STEP 4: STOP + REMOVE
+----------------------
+docker stop nagiosdemo
+docker rm nagiosdemo
+
+
+--------------------------------------------------------
+SECTION 7 — END OF LAB QUICK CHEATSHEET
+--------------------------------------------------------
+
+MAVEN:
+mvn clean package
+mvn install
+
+DOCKER:
+docker build -t app:1 .
+docker run -p 8080:8080 app:1
+
+KUBERNETES:
+kubectl run podname --image=nginx
+kubectl expose pod podname --type=NodePort --port=80
+minikube service podname --url
+
+JENKINS:
+Freestyle → Git → Maven (clean package)
+Pipeline → Script → mvn clean package
+
+NAGIOS:
+docker run -p 8888:80 jasonrivers/nagios
+
+--------------------------------------------------------
+END OF FILE
+--------------------------------------------------------
