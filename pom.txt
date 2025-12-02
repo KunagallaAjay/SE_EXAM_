@@ -197,7 +197,35 @@ post {
   success { mail to:'me@example.com', subject:'Success', body:'Build OK' }
   failure { mail to:'me@example.com', subject:'Failed', body:'Check logs' }
 }
+SMTP server: smtp.gmail.com
+Port: 587
+Use TLS: ✓
+Username: yourname@outlook.com
+Password: (your Outlook password)
 
+pipeline:
+pipeline {
+    agent any
+    stages {
+        stage('Build') {
+            steps {
+                sh 'mvn clean install'
+            }
+        }
+    }
+    post {
+        success {
+            mail to: 'yourgmail@gmail.com',
+                 subject: "SUCCESS: ${env.JOB_NAME} #${env.BUILD_NUMBER}",
+                 body: "Build passed.\nCheck console: ${env.BUILD_URL}"
+        }
+        failure {
+            mail to: 'yourgmail@gmail.com',
+                 subject: "FAILED: ${env.JOB_NAME} #${env.BUILD_NUMBER}",
+                 body: "Build failed.\nCheck console: ${env.BUILD_URL}"
+        }
+    }
+}
 
 --------------------------------------------------------
 SECTION 4 — DOCKER (JAVA + WEB MAVEN PROJECTS)
@@ -233,7 +261,31 @@ services:
 
 Run:
 docker compose up -d
+docker compose ps
+docker compose logs javaapp
 
+web+sql:
+ version: "3"
+
+services:
+
+  web:
+    build: .
+    ports:
+      - "8080:8080"
+    depends_on:
+      - db
+
+  db:
+    image: mysql:8
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpass
+      MYSQL_DATABASE: appdb
+    volumes:
+      - dbdata:/var/lib/mysql
+
+volumes:
+  dbdata:
 
 --------------------------------------------------------
 SECTION 5 — KUBERNETES (MINIKUBE BASIC LAB)
