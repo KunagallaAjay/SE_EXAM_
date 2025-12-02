@@ -1,3 +1,57 @@
+pipeline {
+    agent any
+
+    environment {
+        IMAGE_NAME = "hello-maven-ci"
+    }
+
+    stages {
+        stage('Checkout from GitHub') {
+            steps {
+                git branch: 'main', url: 'https://github.com/KunagallaAjay/hello-maven-ci.git'
+            }
+        }
+
+        stage('Build Maven Project') {
+            steps {
+                bat '''
+                    echo 🚧 Building Maven project...
+                    mvn clean package -DskipTests
+                '''
+            }
+        }
+
+        stage('Build & Push Docker Image') {
+            steps {
+                withCredentials([usernamePassword(credentialsId: 'Dockerhub', usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')]) {
+                    bat '''
+                        echo 🐳 Checking Docker version...
+                        docker --version
+
+                        echo DEBUG: Username="%DOCKER_USER%"
+                        echo DEBUG: Image tag="%DOCKER_USER%/%IMAGE_NAME%:%BUILD_NUMBER%"
+
+                        echo 🐳 Building Docker image...
+                        docker build -t "%DOCKER_USER%/%IMAGE_NAME%:%BUILD_NUMBER%" .
+
+                        echo 🔐 Logging in to Docker Hub...
+                        echo %DOCKER_PASS% | docker login -u "%DOCKER_USER%" --password-stdin
+
+                        echo 📤 Pushing Docker image...
+                        docker push "%DOCKER_USER%/%IMAGE_NAME%:%BUILD_NUMBER%"
+
+                        echo 🏷️ Tagging latest...
+                        docker tag "%DOCKER_USER%/%IMAGE_NAME%:%BUILD_NUMBER%" "%DOCKER_USER%/%IMAGE_NAME%:latest"
+                        docker push "%DOCKER_USER%/%IMAGE_NAME%:latest"
+
+                        echo ✅ Docker image pushed successfully to Docker Hub!
+                    '''
+                }
+            }
+        }
+    }
+}
+
 ========================================================
 DEVOPS MEDIUM-LEVEL LAB GUIDE (Maven + Jenkins + Docker +
 Kubernetes + Nagios)
